@@ -28,6 +28,8 @@ package org.itxtech.mirainative
 
 import org.itxtech.mirainative.bridge.MiraiBridge
 import org.itxtech.mirainative.bridge.MiraiImpl
+import net.mamoe.mirai.console.MiraiConsole
+
 import java.nio.charset.Charset
 
 object Bridge {
@@ -52,8 +54,7 @@ object Bridge {
     const val GROUP_MUTE = 2
 
     // Helper
-
-    fun syncWorkingDir() = setCurrentDirectory((System.getProperty("user.dir") ?: "").toNative())
+    fun syncWorkingDir() = setCurrentDirectory(MiraiConsole.rootPath.toAbsolutePath().toString().toNative())
 
     // Native
 
@@ -175,9 +176,8 @@ object Bridge {
         MiraiBridge.sendGroupMessage(pluginId, group, msg.fromNative())
 
     @JvmStatic
-    fun addLog(pluginId: Int, priority: Int, type: ByteArray, content: ByteArray) {
+    fun addLog(pluginId: Int, priority: Int, type: ByteArray, content: ByteArray) =
         MiraiBridge.addLog(pluginId, priority, type.fromNative(), content.fromNative())
-    }
 
     @JvmStatic
     fun getPluginDataDir(pluginId: Int) = MiraiBridge.getPluginDataDir(pluginId).toNative()

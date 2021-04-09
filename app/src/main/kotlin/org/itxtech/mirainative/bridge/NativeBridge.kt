@@ -42,6 +42,7 @@ object NativeBridge {
     fun getPluginInfo(plugin: NativePlugin) = Bridge.callStringMethod(plugin.id, "pluginInfo".toNative()).fromNative()
 
     fun loadPlugin(plugin: NativePlugin, file: File): Int {
+        Bridge.syncWorkingDir()
         val code = Bridge.loadNativePlugin(
             file.absolutePath.replace("\\", "\\\\").toNative(),
             plugin.id
