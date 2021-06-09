@@ -10,8 +10,8 @@ android {
         applicationId "tech.kokona.mirainative"
         minSdkVersion 23
         targetSdkVersion 30
-        versionCode 2
-        versionName "1.0.1"
+        versionCode 4
+        versionName "1.0.3"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,9 +40,9 @@ android {
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.1.5'
 
-    compileOnly("net.mamoe:mirai-core:2.5.1") // mirai-core 的 API
-    compileOnly("net.mamoe:mirai-console:2.5.1") // 后端
-    testImplementation("net.mamoe:mirai-console-terminal:2.5.1") // 前端, 用于启动测试
+    compileOnly("net.mamoe:mirai-core:2.6.5") // mirai-core 的 API
+    compileOnly("net.mamoe:mirai-console:2.6.5") // 后端
+    testImplementation("net.mamoe:mirai-console-terminal:2.6.5") // 前端, 用于启动测试
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.0.1")
 

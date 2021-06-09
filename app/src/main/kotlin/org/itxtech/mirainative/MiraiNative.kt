@@ -24,6 +24,8 @@
 
 package org.itxtech.mirainative
 
+import android.os.Process
+import android.os.Build
 import io.ktor.util.*
 import kotlinx.coroutines.*
 import net.mamoe.mirai.Bot
@@ -66,44 +68,32 @@ object MiraiNative : KotlinPlugin(
     val imageDataPath: File by lazy { File(dataFolder.absolutePath + File.separatorChar + ".." + File.separatorChar + "image").also { it.mkdirs() } }
     val recDataPath: File by lazy { File(dataFolder.absolutePath + File.separatorChar + ".." + File.separatorChar + "record").also { it.mkdirs() } }
     val systemName: String by lazy {
-        val name = System.getProperty("os.name") ?: ""
+        val name = "android"
         logger.info("当前系统: $name")
-        try {
-            Class.forName("android.os.SystemProperties")
-            logger.info("检测到Android系统")
-            "android"
-        } catch(e : ClassNotFoundException) {
-            if (name.indexOf("win") >= 0 || name.indexOf("Win") >= 0) {
-                "windows"
-            } else if (name.indexOf("mac") >= 0 || name.indexOf("Mac") >= 0) {
-                "macos"
-            } else if (name.indexOf("linux") >= 0 || name.indexOf("Linux") >= 0) {
-                "linux"
-            } else if (name.indexOf("android") >= 0 || name.indexOf("Android") >= 0) {
-                "android"
-            } else {
-                name
+        "android"
+    }
+
+    val systemArch: String by lazy {
+        if (Process.is64Bit()) {
+            val arch = Build.SUPPORTED_64_BIT_ABIS[0];
+            logger.info("当前架构: $arch")
+            when (arch) {
+                "arm64-v8a" -> "aarch64"
+                "x86_64" -> "amd64"
+                else -> arch
+            }
+        } else {
+            val arch = Build.SUPPORTED_32_BIT_ABIS[0];
+            logger.info("当前架构: $arch")
+            when (arch) {
+                "armeabi-v7a" -> "arm"
+                "armeabi" -> "arm"
+                "x86" -> "i386"
+                else -> arch
             }
         }
     }
-    val systemArch: String by lazy {
-        val arch = System.getProperty("os.arch") ?: ""
-        logger.info("当前架构: $arch")
-        when (arch) {
-            "i386" -> "i386"
-            "i686" -> "i386"
-            "x86" -> "i386"
-            "x86_64" -> "amd64"
-            "x64" -> "amd64"
-            "amd64" -> "amd64"
-            "arm" -> "arm"
-            "armv7l" -> "arm"
-            "arm64" -> "aarch64"
-            "armv8l" -> "aarch64"
-            "aarch64" -> "aarch64"
-            else -> arch
-        }
-    }
+
 
         @OptIn(ExperimentalCoroutinesApi::class)
         private val dispatcher = newSingleThreadContext("MiraiNative Main") + SupervisorJob()
