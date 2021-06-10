@@ -57,7 +57,7 @@ object MiraiNative : KotlinPlugin(
             .map { i -> kotlin.random.Random.nextInt(0, charPool.size) }
             .map(charPool::get)
             .joinToString("");
-    private val tmp: File by lazy { File(System.getProperty("java.io.tmpdir") + File.separatorChar + randomPath).also{ it.mkdirs() } }
+    private val tmp: File by lazy { File((System.getProperty("java.io.tmpdir") ?: "") + File.separatorChar + randomPath).also{ it.mkdirs() } }
     private val lib: File by lazy { File(tmp.absolutePath + File.separatorChar + "libraries").also { it.mkdirs() } }
     private val dll: File by lazy { File(tmp.absolutePath + File.separatorChar + "CQP.dll") }
     val pl: File by lazy { File(tmp.absolutePath  + File.separatorChar + "plugins").also { it.mkdirs() } }
@@ -182,6 +182,8 @@ object MiraiNative : KotlinPlugin(
             arrayOf(
                 "data" + File.separatorChar + type + File.separatorChar,
                 dataFolder.absolutePath + File.separatorChar + ".." + File.separatorChar + type + File.separatorChar,
+                (System.getProperty("java.home") ?: "") + File.separatorChar + "bin" + File.separatorChar + type + File.separatorChar,
+                (System.getProperty("java.home") ?: "") + File.separatorChar + type + File.separatorChar,
                 ""
             ).forEach {
                 val f = File(it + name).absoluteFile
