@@ -65,7 +65,9 @@ data class NativePlugin(val file: File, val id: Int) {
         }
     }
 
-    fun getEventOrDefault(key: Int, default: String) = events.getOrDefault(key, default)
+    fun getEventOrDefault(key: Int, default: String): String {
+        return events.get(key) ?: default
+    }
 
     fun shouldCallEvent(key: Int, ignoreState: Boolean = false): Boolean {
         if (!enabled && !ignoreState) {

@@ -28,6 +28,8 @@ import android.os.Process
 import android.os.Build
 import io.ktor.util.*
 import kotlinx.coroutines.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.Serializable
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.console.extension.PluginComponentStorage
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescriptionBuilder
@@ -74,21 +76,34 @@ object MiraiNative : KotlinPlugin(
     }
 
     val systemArch: String by lazy {
-        if (Process.is64Bit()) {
-            val arch = Build.SUPPORTED_64_BIT_ABIS[0];
-            logger.info("当前架构: $arch")
-            when (arch) {
-                "arm64-v8a" -> "aarch64"
-                "x86_64" -> "amd64"
-                else -> arch
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Process.is64Bit()) {
+                val arch = Build.SUPPORTED_64_BIT_ABIS[0];
+                logger.info("当前架构: $arch")
+                when (arch) {
+                    "arm64-v8a" -> "aarch64"
+                    "x86_64" -> "amd64"
+                    else -> arch
+                }
+            } else {
+                val arch = Build.SUPPORTED_32_BIT_ABIS[0];
+                logger.info("当前架构: $arch")
+                when (arch) {
+                    "armeabi-v7a" -> "arm"
+                    "armeabi" -> "arm"
+                    "x86" -> "i386"
+                    else -> arch
+                }
             }
         } else {
-            val arch = Build.SUPPORTED_32_BIT_ABIS[0];
+            val arch = Build.SUPPORTED_ABIS[0];
             logger.info("当前架构: $arch")
             when (arch) {
                 "armeabi-v7a" -> "arm"
                 "armeabi" -> "arm"
                 "x86" -> "i386"
+                "arm64-v8a" -> "aarch64"
+                "x86_64" -> "amd64"
                 else -> arch
             }
         }

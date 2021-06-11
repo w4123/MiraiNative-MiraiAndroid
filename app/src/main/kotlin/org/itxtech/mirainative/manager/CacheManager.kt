@@ -40,7 +40,6 @@ import net.mamoe.mirai.message.data.Voice
 import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.utils.MiraiExperimentalApi
 import org.itxtech.mirainative.MiraiNative
-import java.time.Instant
 
 @OptIn(MiraiExperimentalApi::class)
 object CacheManager {
@@ -63,9 +62,10 @@ object CacheManager {
         while (currClearCacheId < id) {
             val sendTime = msgCache[currClearCacheId]?.time
             if (sendTime != null) {
-                if (Instant.now().epochSecond - sendTime > 3600) {
+                if (System.currentTimeMillis() / 1000 - sendTime > 3600) {
                     msgCache.remove(currClearCacheId)
                 } else break;
+
             }
             currClearCacheId++
         }
