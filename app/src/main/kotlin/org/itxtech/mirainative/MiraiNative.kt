@@ -34,6 +34,7 @@ import net.mamoe.mirai.Bot
 import net.mamoe.mirai.console.extension.PluginComponentStorage
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescriptionBuilder
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
+import net.mamoe.mirai.console.MiraiConsole
 import org.itxtech.mirainative.manager.CacheManager
 import org.itxtech.mirainative.manager.EventManager
 import org.itxtech.mirainative.manager.LibraryManager
@@ -46,6 +47,7 @@ import java.io.InputStream
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.jar.Manifest
+import java.util.zip.ZipFile
 
 object MiraiNative : KotlinPlugin(
     JvmPluginDescriptionBuilder("MiraiNative", "2.0.1")
@@ -152,6 +154,26 @@ object MiraiNative : KotlinPlugin(
         }
 
         override fun PluginComponentStorage.onLoad() {
+            val UpdateZip = File(MiraiConsole.rootPath.toAbsolutePath().toString() + File.separatorChar + "mn-install.zip")
+            if (UpdateZip.exists() && !UpdateZip.isDirectory()) {
+                ZipFile(UpdateZip).use { zip ->
+                    zip.entries().asSequence().forEach { entry ->
+                        zip.getInputStream(entry).use { input ->
+                            val destPath = File(MiraiConsole.rootPath.toAbsolutePath().toString() +
+                                    File.separatorChar + entry.name)
+                            if (entry.isDirectory()) {
+                                destPath.mkdirs()
+                            } else {
+                                destPath.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                        }
+                    }
+                }
+                UpdateZip.delete()
+            }
+
             var nativeLib = getResourceAsStream("CQP.android.aarch64.dll")!!
             try {
                 nativeLib = getResourceAsStream("CQP.$systemName.$systemArch.dll")!!
