@@ -164,6 +164,7 @@ object MiraiNative : KotlinPlugin(
                             if (entry.isDirectory()) {
                                 destPath.mkdirs()
                             } else {
+                                File(destPath.getParent()).mkdirs()
                                 destPath.outputStream().use { output ->
                                     input.copyTo(output)
                                 }
