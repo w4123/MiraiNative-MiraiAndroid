@@ -47,7 +47,7 @@ import java.io.InputStream
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.jar.Manifest
-import java.util.zip.ZipFile
+import java.util.zip.ZipInputStream
 
 object MiraiNative : KotlinPlugin(
     JvmPluginDescriptionBuilder("MiraiNative", "2.0.1")
@@ -69,6 +69,7 @@ object MiraiNative : KotlinPlugin(
     private val Plib: File by lazy { File(dataFolder.absolutePath + File.separatorChar + "libraries").also { it.mkdirs() } }
     private val Pdll: File by lazy { File(dataFolder.absolutePath + File.separatorChar + "CQP.dll") }
     private val Ppl: File by lazy { File(dataFolder.absolutePath + File.separatorChar + "plugins").also { it.mkdirs() } }
+    private val Pchecksum: File by lazy { File(dataFolder.absolutePath + File.separatorChar + ".mninstallchecksum") }
     val imageDataPath: File by lazy { File(dataFolder.absolutePath + File.separatorChar + ".." + File.separatorChar + "image").also { it.mkdirs() } }
     val recDataPath: File by lazy { File(dataFolder.absolutePath + File.separatorChar + ".." + File.separatorChar + "record").also { it.mkdirs() } }
     val systemName: String by lazy {
@@ -153,45 +154,68 @@ object MiraiNative : KotlinPlugin(
             }
         }
 
-        override fun PluginComponentStorage.onLoad() {
-            val UpdateZip = File(MiraiConsole.rootPath.toAbsolutePath().toString() + File.separatorChar + "mn-install.zip")
-            if (UpdateZip.exists() && !UpdateZip.isDirectory()) {
-                ZipFile(UpdateZip).use { zip ->
-                    zip.entries().asSequence().forEach { entry ->
-                        zip.getInputStream(entry).use { input ->
-                            val destPath = File(MiraiConsole.rootPath.toAbsolutePath().toString() +
-                                    File.separatorChar + entry.name)
-                            if (entry.isDirectory()) {
-                                destPath.mkdirs()
-                            } else {
-                                File(destPath.getParent()).mkdirs()
-                                destPath.outputStream().use { output ->
-                                    input.copyTo(output)
-                                }
-                            }
+        fun unzipToRootPath(UpdateZip: InputStream) {
+            ZipInputStream(UpdateZip).use { zip ->
+                generateSequence { zip.nextEntry }.forEach { entry ->
+                    val destPath = File(MiraiConsole.rootPath.toAbsolutePath().toString() +
+                            File.separatorChar + entry.name)
+                    if (entry.isDirectory()) {
+                        destPath.mkdirs()
+                    } else {
+                        val parPath = destPath.getParent()
+                        if (parPath != null) {
+                            File(parPath).mkdirs()
+                        }
+                        destPath.outputStream().use { output ->
+                            zip.copyTo(output)
                         }
                     }
+                }
+            }
+        }
+
+        override fun PluginComponentStorage.onLoad() {
+            var InstallZip = getResourceAsStream("mn-install.zip")
+            if (InstallZip != null) {
+                InstallZip.use { zip ->
+                    val check = zip.readBytes().checksum().toString()
+                    if (!Pchecksum.exists() || Pchecksum.readText() != check) {
+                        getResourceAsStream("mn-install.zip")!!.use { zip1 ->
+                            unzipToRootPath(zip1)
+                        }
+                        Pchecksum.writeText(check)
+                    }
+                }
+            }
+
+            val UpdateZip = File(MiraiConsole.rootPath.toAbsolutePath().toString() + File.separatorChar + "mn-install.zip")
+            if (UpdateZip.exists() && !UpdateZip.isDirectory()) {
+                UpdateZip.inputStream().use { zip ->
+                    unzipToRootPath(zip)
                 }
                 UpdateZip.delete()
             }
 
-            var nativeLib = getResourceAsStream("CQP.android.aarch64.dll")!!
+            var nativeLib : InputStream
             try {
                 nativeLib = getResourceAsStream("CQP.$systemName.$systemArch.dll")!!
             } catch(e : NullPointerException) {
                 logger.warning("当前运行时环境可能不与 Mirai Native 兼容。")
                 logger.warning("如果您正在开发或调试其他环境下的 Mirai Native，请忽略此警告。")
+                nativeLib = getResourceAsStream("CQP.android.aarch64.dll")!!
             }
 
+            val libData = nativeLib.readBytes()
+            nativeLib.close()
+
             if (!Pdll.exists()) {
-                logger.error("找不到 ${Pdll.absolutePath}，写出自带的 CQP.dll。")
-                val cqp = FileOutputStream(Pdll)
-                nativeLib.copyTo(cqp)
-                cqp.close()
-            } else if (nativeLib.readBytes().checksum() != Pdll.readBytes().checksum()) {
-                logger.warning("${Pdll.absolutePath} 与 Mirai Native 内置的 CQP.dll 的校验和不同。")
-                logger.warning("如运行时出现问题，请尝试删除 ${Pdll.absolutePath} 并重启 mirai。")
+                logger.info("找不到 ${Pdll.absolutePath}，写出自带的 CQP.dll。")
+                Pdll.writeBytes(libData)
+            } else if (libData.checksum() != Pdll.readBytes().checksum()) {
+                logger.warning("${Pdll.absolutePath} 与 Mirai Native 内置的 CQP.dll 的校验和不同。已用内置版本替换。")
+                Pdll.writeBytes(libData)
             }
+
             copyPlugins()
             initDataDir()
         }
