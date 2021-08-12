@@ -25,7 +25,6 @@
 package org.itxtech.mirainative.manager
 
 import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.update
 import kotlinx.coroutines.launch
 import net.mamoe.mirai.contact.AnonymousMember
 import net.mamoe.mirai.contact.NormalMember
@@ -45,11 +44,10 @@ import org.itxtech.mirainative.MiraiNative
 object CacheManager {
     private val msgCache = hashMapOf<Int, MessageSource>()
     private val evCache = hashMapOf<Int, BotEvent>()
-    private val senders = hashMapOf<Long, NormalMember>()
+    private val senders = hashMapOf<Long, User>()
     private val anonymousMembers = hashMapOf<Long, HashMap<String, AnonymousMember>>()
     private val records = hashMapOf<String, Voice>()
     private val internalId = atomic(0)
-    private val internalClearCacheId = atomic(0)
 
     fun nextId() = internalId.getAndIncrement()
 
@@ -58,18 +56,6 @@ object CacheManager {
     fun getEvent(id: String) = evCache[id.toInt()]?.also { evCache.remove(id.toInt()) }
 
     fun cacheMessage(source: MessageSource, id: Int = nextId(), chain: MessageChain? = null): Int {
-        var currClearCacheId = internalClearCacheId.value
-        while (currClearCacheId < id) {
-            val sendTime = msgCache[currClearCacheId]?.time
-            if (sendTime != null) {
-                if (System.currentTimeMillis() / 1000 - sendTime > 3600) {
-                    msgCache.remove(currClearCacheId)
-                } else break;
-
-            }
-            currClearCacheId++
-        }
-        internalClearCacheId.update{currClearCacheId}
         msgCache[id] = source
         chain?.forEach {
             if (it is Voice) {
@@ -79,8 +65,12 @@ object CacheManager {
         return id
     }
 
+    fun cacheMember(member: User) {
+        senders[member.id] = member
+    }
+
     fun cacheTempMessage(message: GroupTempMessageEvent, id: Int = nextId()): Int {
-        senders[message.sender.id] = message.sender
+        cacheMember(message.sender)
         return cacheMessage(message.message.source, id, message.message)
     }
 
