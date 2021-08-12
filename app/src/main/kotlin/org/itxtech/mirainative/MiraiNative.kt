@@ -113,10 +113,10 @@ object MiraiNative : KotlinPlugin(
     }
 
 
-        @OptIn(ExperimentalCoroutinesApi::class)
+        @OptIn(ObsoleteCoroutinesApi::class)
         private val dispatcher = newSingleThreadContext("MiraiNative Main") + SupervisorJob()
 
-        @OptIn(ExperimentalCoroutinesApi::class)
+        @OptIn(ObsoleteCoroutinesApi::class)
         val menuDispatcher = newSingleThreadContext("MiraiNative Menu")
 
         @OptIn(ObsoleteCoroutinesApi::class)
