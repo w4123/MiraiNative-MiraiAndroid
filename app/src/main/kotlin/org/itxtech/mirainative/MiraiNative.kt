@@ -50,7 +50,7 @@ import java.util.jar.Manifest
 import java.util.zip.ZipInputStream
 
 object MiraiNative : KotlinPlugin(
-    JvmPluginDescriptionBuilder("MiraiNative", "2.0.2-cp-android")
+    JvmPluginDescriptionBuilder("MiraiNative", "2.0.3-cp-android")
         .id("org.itxtech.mirainative")
         .author("iTX Technologies & 溯洄")
         .info("强大的 mirai 原生插件加载器。")
