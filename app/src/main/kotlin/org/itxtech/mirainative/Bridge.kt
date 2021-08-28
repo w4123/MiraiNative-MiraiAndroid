@@ -264,8 +264,8 @@ object Bridge {
     fun setGroupAnonymous(pluginId: Int, group: Long, enable: Boolean) = 0
 
     @JvmStatic
-    fun setGroupAdmin(pluginId: Int, group: Long, account: Long, admin: Boolean) = 0
-    //true => set, false => revoke
+    fun setGroupAdmin(pluginId: Int, group: Long, account: Long, admin: Boolean) =
+        MiraiBridge.setGroupAdmin(pluginId, group, account, admin)
 
     // Wont' Implement
 
