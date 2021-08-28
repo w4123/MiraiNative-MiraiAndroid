@@ -113,205 +113,212 @@ object MiraiNative : KotlinPlugin(
     }
 
 
-        @OptIn(ObsoleteCoroutinesApi::class)
-        private val dispatcher = newSingleThreadContext("MiraiNative Main") + SupervisorJob()
+    @OptIn(ObsoleteCoroutinesApi::class)
+    private val dispatcher = newSingleThreadContext("MiraiNative Main") + SupervisorJob()
 
-        @OptIn(ObsoleteCoroutinesApi::class)
-        val menuDispatcher = newSingleThreadContext("MiraiNative Menu")
+    @OptIn(ObsoleteCoroutinesApi::class)
+    val menuDispatcher = newSingleThreadContext("MiraiNative Menu")
 
-        @OptIn(ObsoleteCoroutinesApi::class)
-        val eventDispatcher =
-            newFixedThreadPoolContext(when {
-                Runtime.getRuntime().availableProcessors() == 0 -> 4
-                else -> Runtime.getRuntime().availableProcessors()
-            } * 2, "MiraiNative Events")
+    @OptIn(ObsoleteCoroutinesApi::class)
+    val eventDispatcher =
+        newFixedThreadPoolContext(when {
+            Runtime.getRuntime().availableProcessors() == 0 -> 4
+            else -> Runtime.getRuntime().availableProcessors()
+        } * 2, "MiraiNative Events")
 
-        var botOnline = false
-        val bot: Bot by lazy { Bot.instances.first() }
+    var botOnline = false
+    val bot: Bot by lazy { Bot.instances.first() }
 
-        private fun ByteArray.checksum() = BigInteger(1, MessageDigest.getInstance("MD5").digest(this))
+    private fun ByteArray.checksum() = BigInteger(1, MessageDigest.getInstance("MD5").digest(this))
 
-        private fun checkNativeLibs() {
-            logger.info("正在加载 Mirai Native Bridge ${dll.absolutePath}")
-            LibraryManager.load(dll.absolutePath)
+    val json = Json {
+        isLenient = true
+        ignoreUnknownKeys = true
+        allowSpecialFloatingPointValues = true
+        useArrayPolymorphism = true
+    }
 
-            lib.listFiles()?.forEach { file ->
-                if (file.absolutePath.endsWith(".dll")) {
-                    logger.info("正在加载外部库 " + file.absolutePath)
-                    LibraryManager.load(file.absolutePath)
-                }
+    private fun checkNativeLibs() {
+        logger.info("正在加载 Mirai Native Bridge ${dll.absolutePath}")
+        LibraryManager.load(dll.absolutePath)
+
+        lib.listFiles()?.forEach { file ->
+            if (file.absolutePath.endsWith(".dll")) {
+                logger.info("正在加载外部库 " + file.absolutePath)
+                LibraryManager.load(file.absolutePath)
             }
-        }
-
-        fun setBotOnline() {
-            if (!botOnline) {
-                botOnline = true
-                nativeLaunch {
-                    ConfigMan.init()
-                    logger.info("Mirai Native 正启用所有插件。")
-                    PluginManager.enablePlugins()
-                }
-            }
-        }
-
-        fun unzipToRootPath(UpdateZip: InputStream) {
-            ZipInputStream(UpdateZip).use { zip ->
-                generateSequence { zip.nextEntry }.forEach { entry ->
-                    val destPath = File(MiraiConsole.rootPath.toAbsolutePath().toString() +
-                            File.separatorChar + entry.name)
-                    if (entry.isDirectory()) {
-                        destPath.mkdirs()
-                    } else {
-                        val parPath = destPath.getParent()
-                        if (parPath != null) {
-                            File(parPath).mkdirs()
-                        }
-                        destPath.outputStream().use { output ->
-                            zip.copyTo(output)
-                        }
-                    }
-                }
-            }
-        }
-
-        override fun PluginComponentStorage.onLoad() {
-            var InstallZip = getResourceAsStream("mn-install.zip")
-            if (InstallZip != null) {
-                InstallZip.use { zip ->
-                    val check = zip.readBytes().checksum().toString()
-                    if (!Pchecksum.exists() || Pchecksum.readText() != check) {
-                        getResourceAsStream("mn-install.zip")!!.use { zip1 ->
-                            unzipToRootPath(zip1)
-                        }
-                        Pchecksum.writeText(check)
-                    }
-                }
-            }
-
-            val UpdateZip = File(MiraiConsole.rootPath.toAbsolutePath().toString() + File.separatorChar + "mn-install.zip")
-            if (UpdateZip.exists() && !UpdateZip.isDirectory()) {
-                UpdateZip.inputStream().use { zip ->
-                    unzipToRootPath(zip)
-                }
-                UpdateZip.delete()
-            }
-
-            var nativeLib : InputStream
-            try {
-                nativeLib = getResourceAsStream("CQP.$systemName.$systemArch.dll")!!
-            } catch(e : NullPointerException) {
-                logger.warning("当前运行时环境可能不与 Mirai Native 兼容。")
-                logger.warning("如果您正在开发或调试其他环境下的 Mirai Native，请忽略此警告。")
-                nativeLib = getResourceAsStream("CQP.android.aarch64.dll")!!
-            }
-
-            val libData = nativeLib.readBytes()
-            nativeLib.close()
-
-            if (!Pdll.exists()) {
-                logger.info("找不到 ${Pdll.absolutePath}，写出自带的 CQP.dll。")
-                Pdll.writeBytes(libData)
-            } else if (libData.checksum() != Pdll.readBytes().checksum()) {
-                logger.warning("${Pdll.absolutePath} 与 Mirai Native 内置的 CQP.dll 的校验和不同。已用内置版本替换。")
-                Pdll.writeBytes(libData)
-            }
-
-            copyPlugins()
-            initDataDir()
-        }
-
-        private fun copyPlugins() {
-            Pdll.copyTo(dll)
-            Plib.copyRecursively(lib)
-            Ppl.copyRecursively(pl)
-        }
-
-        private fun File.mkdirsOrExists() = if (exists()) true else mkdirs()
-
-        private fun initDataDir() {
-            if (!imageDataPath.mkdirsOrExists() || !recDataPath.mkdirsOrExists()) {
-                logger.warning("图片或语音文件夹创建失败，可能没有使用管理员权限运行。位置：$imageDataPath 与 $recDataPath")
-            }
-            File(imageDataPath, "MIRAI_NATIVE_IMAGE_DATA").createNewFile()
-            File(recDataPath, "MIRAI_NATIVE_RECORD_DATA").createNewFile()
-        }
-
-        @OptIn(InternalAPI::class)
-        fun getDataFile(type: String, name: String): InputStream? {
-            if (name.startsWith("base64://")) {
-                return ByteArrayInputStream(name.split("base64://", limit = 2)[1].decodeBase64Bytes())
-            }
-            arrayOf(
-                "data" + File.separatorChar + type + File.separatorChar,
-                dataFolder.absolutePath + File.separatorChar + ".." + File.separatorChar + type + File.separatorChar,
-                (System.getProperty("java.home") ?: "") + File.separatorChar + "bin" + File.separatorChar + type + File.separatorChar,
-                (System.getProperty("java.home") ?: "") + File.separatorChar + type + File.separatorChar,
-                ""
-            ).forEach {
-                val f = File(it + name).absoluteFile
-                if (f.exists()) {
-                    return f.inputStream()
-                }
-            }
-            return null
-        }
-
-        private suspend fun CoroutineScope.processMessage() {
-            while (isActive) {
-                Bridge.processMessage()
-                delay(10)
-            }
-        }
-
-        override fun onEnable() {
-
-            checkNativeLibs()
-            PluginManager.loadPlugins()
-
-            nativeLaunch { processMessage() }
-            launch(menuDispatcher) { processMessage() }
-
-            PluginManager.registerCommands()
-            EventManager.registerEvents()
-
-            if (Bot.instances.isNotEmpty() && Bot.instances.first().isOnline) {
-                setBotOnline()
-            }
-
-            launch {
-                while (isActive) {
-                    CacheManager.checkCacheLimit(ConfigMan.config.cacheExpiration)
-                    delay(60000L) //1min
-                }
-            }
-        }
-
-        override fun onDisable() {
-            ConfigMan.save()
-            CacheManager.clear()
-            runBlocking {
-                PluginManager.unloadPlugins().join()
-                nativeLaunch { Bridge.shutdown() }.join()
-                dispatcher.cancel()
-                dispatcher[Job]?.join()
-            }
-            tmp.deleteRecursively()
-        }
-
-        fun nativeLaunch(b: suspend CoroutineScope.() -> Unit) = launch(context = dispatcher, block = b)
-
-        fun launchEvent(b: suspend CoroutineScope.() -> Unit) = launch(context = eventDispatcher, block = b)
-
-        fun getVersion(): String {
-            var version = description.version.toString()
-            val mf = javaClass.classLoader?.getResources("META-INF/MANIFEST.MF")
-            while (mf != null && mf.hasMoreElements()) {
-                val manifest = Manifest(mf.nextElement().openStream())
-                if ("iTXTech MiraiNative" == manifest.mainAttributes.getValue("Name")) {
-                    version += "-" + manifest.mainAttributes.getValue("Revision")
-                }
-            }
-            return version
         }
     }
+
+    fun setBotOnline() {
+        if (!botOnline) {
+            botOnline = true
+            nativeLaunch {
+                ConfigMan.init()
+                logger.info("Mirai Native 正启用所有插件。")
+                PluginManager.enablePlugins()
+            }
+        }
+    }
+
+    fun unzipToRootPath(UpdateZip: InputStream) {
+        ZipInputStream(UpdateZip).use { zip ->
+            generateSequence { zip.nextEntry }.forEach { entry ->
+                val destPath = File(MiraiConsole.rootPath.toAbsolutePath().toString() +
+                        File.separatorChar + entry.name)
+                if (entry.isDirectory()) {
+                    destPath.mkdirs()
+                } else {
+                    val parPath = destPath.getParent()
+                    if (parPath != null) {
+                        File(parPath).mkdirs()
+                    }
+                    destPath.outputStream().use { output ->
+                        zip.copyTo(output)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun PluginComponentStorage.onLoad() {
+        var InstallZip = getResourceAsStream("mn-install.zip")
+        if (InstallZip != null) {
+            InstallZip.use { zip ->
+                val check = zip.readBytes().checksum().toString()
+                if (!Pchecksum.exists() || Pchecksum.readText() != check) {
+                    getResourceAsStream("mn-install.zip")!!.use { zip1 ->
+                        unzipToRootPath(zip1)
+                    }
+                    Pchecksum.writeText(check)
+                }
+            }
+        }
+
+        val UpdateZip = File(MiraiConsole.rootPath.toAbsolutePath().toString() + File.separatorChar + "mn-install.zip")
+        if (UpdateZip.exists() && !UpdateZip.isDirectory()) {
+            UpdateZip.inputStream().use { zip ->
+                unzipToRootPath(zip)
+            }
+            UpdateZip.delete()
+        }
+
+        var nativeLib : InputStream
+        try {
+            nativeLib = getResourceAsStream("CQP.$systemName.$systemArch.dll")!!
+        } catch(e : NullPointerException) {
+            logger.warning("当前运行时环境可能不与 Mirai Native 兼容。")
+            logger.warning("如果您正在开发或调试其他环境下的 Mirai Native，请忽略此警告。")
+            nativeLib = getResourceAsStream("CQP.android.aarch64.dll")!!
+        }
+
+        val libData = nativeLib.readBytes()
+        nativeLib.close()
+
+        if (!Pdll.exists()) {
+            logger.info("找不到 ${Pdll.absolutePath}，写出自带的 CQP.dll。")
+            Pdll.writeBytes(libData)
+        } else if (libData.checksum() != Pdll.readBytes().checksum()) {
+            logger.warning("${Pdll.absolutePath} 与 Mirai Native 内置的 CQP.dll 的校验和不同。已用内置版本替换。")
+            Pdll.writeBytes(libData)
+        }
+
+        copyPlugins()
+        initDataDir()
+    }
+
+    private fun copyPlugins() {
+        Pdll.copyTo(dll)
+        Plib.copyRecursively(lib)
+        Ppl.copyRecursively(pl)
+    }
+
+    private fun File.mkdirsOrExists() = if (exists()) true else mkdirs()
+
+    private fun initDataDir() {
+        if (!imageDataPath.mkdirsOrExists() || !recDataPath.mkdirsOrExists()) {
+            logger.warning("图片或语音文件夹创建失败，可能没有使用管理员权限运行。位置：$imageDataPath 与 $recDataPath")
+        }
+        File(imageDataPath, "MIRAI_NATIVE_IMAGE_DATA").createNewFile()
+        File(recDataPath, "MIRAI_NATIVE_RECORD_DATA").createNewFile()
+    }
+
+    @OptIn(InternalAPI::class)
+    fun getDataFile(type: String, name: String): InputStream? {
+        if (name.startsWith("base64://")) {
+            return ByteArrayInputStream(name.split("base64://", limit = 2)[1].decodeBase64Bytes())
+        }
+        arrayOf(
+            "data" + File.separatorChar + type + File.separatorChar,
+            dataFolder.absolutePath + File.separatorChar + ".." + File.separatorChar + type + File.separatorChar,
+            (System.getProperty("java.home") ?: "") + File.separatorChar + "bin" + File.separatorChar + type + File.separatorChar,
+            (System.getProperty("java.home") ?: "") + File.separatorChar + type + File.separatorChar,
+            ""
+        ).forEach {
+            val f = File(it + name).absoluteFile
+            if (f.exists()) {
+                return f.inputStream()
+            }
+        }
+        return null
+    }
+
+    private suspend fun CoroutineScope.processMessage() {
+        while (isActive) {
+            Bridge.processMessage()
+            delay(10)
+        }
+    }
+
+    override fun onEnable() {
+
+        checkNativeLibs()
+        PluginManager.loadPlugins()
+
+        nativeLaunch { processMessage() }
+        launch(menuDispatcher) { processMessage() }
+
+        PluginManager.registerCommands()
+        EventManager.registerEvents()
+
+        if (Bot.instances.isNotEmpty() && Bot.instances.first().isOnline) {
+            setBotOnline()
+        }
+
+        launch {
+            while (isActive) {
+                CacheManager.checkCacheLimit(ConfigMan.config.cacheExpiration)
+                delay(60000L) //1min
+            }
+        }
+    }
+
+    override fun onDisable() {
+        ConfigMan.save()
+        CacheManager.clear()
+        runBlocking {
+            PluginManager.unloadPlugins().join()
+            nativeLaunch { Bridge.shutdown() }.join()
+            dispatcher.cancel()
+            dispatcher[Job]?.join()
+        }
+        tmp.deleteRecursively()
+    }
+
+    fun nativeLaunch(b: suspend CoroutineScope.() -> Unit) = launch(context = dispatcher, block = b)
+
+    fun launchEvent(b: suspend CoroutineScope.() -> Unit) = launch(context = eventDispatcher, block = b)
+
+    fun getVersion(): String {
+        var version = description.version.toString()
+        val mf = javaClass.classLoader?.getResources("META-INF/MANIFEST.MF")
+        while (mf != null && mf.hasMoreElements()) {
+            val manifest = Manifest(mf.nextElement().openStream())
+            if ("iTXTech MiraiNative" == manifest.mainAttributes.getValue("Name")) {
+                version += "-" + manifest.mainAttributes.getValue("Revision")
+            }
+        }
+        return version
+    }
+}
 
