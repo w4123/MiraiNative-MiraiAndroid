@@ -63,7 +63,7 @@ object CacheManager {
     private val evCache = hashMapWrapperOf<Int, BotEvent>()
     private val senders = hashMapWrapperOf<Long, User>()
     private val anonymousMembers = hashMapOf<Long, HashMap<String, CacheWrapper<AnonymousMember>>>()
-    private val records = hashMapWrapperOf<String, Audio>()
+    private val records = hashMapWrapperOf<String, OnlineAudio>()
     private val internalId = atomic(0)
 
     fun checkCacheLimit(exp: Int) {
@@ -83,7 +83,7 @@ object CacheManager {
     fun cacheMessage(source: MessageSource, id: Int = nextId(), chain: MessageChain? = null): Int {
         msgCache[id] = source
         chain?.forEach {
-            if (it is Audio) {
+            if (it is OnlineAudio) {
                 records[it.filename] = it
             }
         }
@@ -118,7 +118,7 @@ object CacheManager {
 
     fun getMessage(id: Int): MessageSource? = msgCache.getObj(id)
 
-    fun getRecord(name: String): Audio? = records.getObj(name.replace(".mnrec", ""))
+    fun getRecord(name: String): OnlineAudio? = records.getObj(name.replace(".mnrec", ""))
 
     fun findUser(id: Long): User? {
         var member = MiraiNative.bot.getFriend(id) ?: senders.getObj(id)

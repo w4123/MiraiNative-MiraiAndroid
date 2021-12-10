@@ -339,7 +339,7 @@ object MiraiBridge {
         call("CQ_getRecordV2", pluginId, "", "Error occurred when plugin %0 downloading record $record") {
             return runBlocking {
                 val rec = CacheManager.getRecord(record.replace(".mnrec", ""))
-                if (rec != null && rec is OnlineAudio) {
+                if (rec != null) {
                     val file = File(
                         MiraiNative.recDataPath.absolutePath + File.separatorChar +
                                 BigInteger(1, rec.fileMd5).toString(16)

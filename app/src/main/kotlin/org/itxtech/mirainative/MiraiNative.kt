@@ -34,13 +34,14 @@ import net.mamoe.mirai.Bot
 import net.mamoe.mirai.console.extension.PluginComponentStorage
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescriptionBuilder
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
+import net.mamoe.mirai.utils.ExternalResource
+import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import net.mamoe.mirai.console.MiraiConsole
 import org.itxtech.mirainative.manager.CacheManager
 import org.itxtech.mirainative.manager.EventManager
 import org.itxtech.mirainative.manager.LibraryManager
 import org.itxtech.mirainative.manager.PluginManager
 import org.itxtech.mirainative.util.ConfigMan
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -50,7 +51,7 @@ import java.util.jar.Manifest
 import java.util.zip.ZipInputStream
 
 object MiraiNative : KotlinPlugin(
-    JvmPluginDescriptionBuilder("MiraiNative", "2.0.3-cp-android")
+    JvmPluginDescriptionBuilder("MiraiNative", "2.0.4-cp-android")
         .id("org.itxtech.mirainative")
         .author("iTX Technologies & 溯洄")
         .info("强大的 mirai 原生插件加载器。")
@@ -244,9 +245,9 @@ object MiraiNative : KotlinPlugin(
     }
 
     @OptIn(InternalAPI::class)
-    fun getDataFile(type: String, name: String): InputStream? {
+    fun getDataFile(type: String, name: String): ExternalResource? {
         if (name.startsWith("base64://")) {
-            return ByteArrayInputStream(name.split("base64://", limit = 2)[1].decodeBase64Bytes())
+            return name.split("base64://", limit = 2)[1].decodeBase64Bytes().toExternalResource()
         }
         arrayOf(
             "data" + File.separatorChar + type + File.separatorChar,
@@ -257,7 +258,7 @@ object MiraiNative : KotlinPlugin(
         ).forEach {
             val f = File(it + name).absoluteFile
             if (f.exists()) {
-                return f.inputStream()
+                return f.toExternalResource()
             }
         }
         return null
